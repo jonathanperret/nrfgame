@@ -102,9 +102,9 @@ module board() {
 case_edge_thickness = 1.05; // actual 1.2
 case_edge_margin = 0.5;
 case_bottom_height = 4.4;
-case_bottom_overheight = 1.6;
 case_bottom_thickness = .8;
 case_bottom_support_width = 7.35;
+case_bottom_support_height = 2.8;
 case_bottom_inner_length = pcb_length + 2 * case_edge_margin;
 case_bottom_inner_width = pcb_width + 2 * case_edge_margin;
 
@@ -125,30 +125,26 @@ module case_bottom() {
     hull() {
       for(x=[-case_edge_margin, pcb_length + case_edge_margin],
           y=[-case_edge_margin, pcb_width + case_edge_margin])
-      translate([x, y, 0])
+      translate([x, y, case_edge_thickness])
       {
-        h = case_bottom_overheight - case_edge_thickness;
-        translate([0, 0, -h])
-        cylinder(r=case_edge_thickness, h=h, $fn=16);
-
-        translate([0, 0, -(case_bottom_height - case_edge_thickness)])
+        cylinder(r=case_edge_thickness, h=case_bottom_height - case_edge_thickness, $fn=16);
         sphere(r=case_edge_thickness, $fn=16);
       }
     }
 
     // case inner space
     difference() {
-      translate([-case_edge_margin, -case_edge_margin, -case_bottom_height + case_bottom_thickness - epsilon])
+      translate([-case_edge_margin, -case_edge_margin, case_bottom_thickness])
       cube([case_bottom_inner_length, case_bottom_inner_width, case_bottom_height]);
 
       // board supports
       for(x=[-case_edge_margin, pcb_length + case_edge_margin],
           y=[-case_edge_margin, pcb_width + case_edge_margin])
       {
-        translate([x, y, -case_bottom_height])
+        translate([x, y, 0])
         cylinder(
           r = case_bottom_support_width,
-          h = case_bottom_height - pcb_thickness
+          h = case_bottom_support_height
         );
       }
     }
@@ -159,28 +155,28 @@ module case_bottom() {
       translate([
         -holder_cube_length / 2 - battery_holder_case_cutout_margin,
         -holder_cube_width / 2 - battery_holder_case_cutout_margin,
-        -holder_cube_height
+        -epsilon
       ])
       cube([
         holder_cube_length + battery_holder_case_cutout_margin * 2,
         holder_cube_width + battery_holder_case_cutout_margin * 2,
-        holder_cube_height
+        2 * case_bottom_thickness
       ]);
 
       translate([
         0,
         holder_total_width - holder_cube_width / 2 - holder_cylinder_diameter / 2,
-        -holder_cylinder_thickness
+        -epsilon
       ])
       cylinder(
         d=holder_cylinder_diameter + battery_holder_case_cutout_margin * 2,
-        h=holder_cylinder_thickness,
+        h=2 * case_bottom_thickness,
         $fn=32
       );
     }
 
     // screw holes
-    translate([0, 0, -case_bottom_height - epsilon])
+    translate([0, 0, -epsilon])
     for(x=[pcb_mounting_hole_offset, pcb_length - pcb_mounting_hole_offset],
         y=[pcb_mounting_hole_offset, pcb_width - pcb_mounting_hole_offset])
     {
@@ -193,7 +189,7 @@ module case_bottom() {
 }
 
 
-%#translate([0, 0, -pcb_thickness])
+%#translate([0, 0, case_bottom_support_height])
 board();
 
 case_bottom();
