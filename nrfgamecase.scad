@@ -120,6 +120,7 @@ screw_hole_diameter = 2.4;
 screw_head_diameter = 6;
 screw_head_thickness = 1.5;
 screw_length = 5;
+screw_bottom_case_thickness = 0.8;
 
 module case_bottom() {
   intersection() {
@@ -228,8 +229,10 @@ module full_case() {
         y=[pcb_mounting_hole_offset, pcb_width - pcb_mounting_hole_offset])
     {
       translate([x, y, 0]) {
-        cylinder(h=screw_length, d=screw_hole_diameter);
-        cylinder(h=screw_head_thickness, d=screw_head_diameter);
+        translate([0, 0, case_bottom_support_height - screw_bottom_case_thickness - epsilon])
+          cylinder(h=screw_length, d=screw_hole_diameter);
+
+        cylinder(h=case_bottom_support_height - screw_bottom_case_thickness, d=screw_head_diameter);
       }
     }
   }
