@@ -105,7 +105,7 @@ case_height = 10;
 case_bottom_height = 5.4;
 case_bottom_thickness = .8;
 case_bottom_support_width = 7.35;
-case_bottom_support_height = 2.8;
+case_bottom_support_height = 3.2;
 case_bottom_inner_length = pcb_length + 2 * case_edge_margin;
 case_bottom_inner_width = pcb_width + 2 * case_edge_margin;
 
