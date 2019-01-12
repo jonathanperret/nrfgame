@@ -1,7 +1,26 @@
 $fn = 16;
 epsilon = 0.01;
 
-module board() {
+module roundcube(size, radius, top=false, bottom=false, $fn=8) {
+  hull() {
+    for(x=[radius, size.x - radius],
+        y=[radius, size.y - radius])
+    translate([x, y, 0])
+    {
+      translate([0, 0, bottom ? radius : 0])
+      cylinder(r=radius, h=size.z - (top ? radius : 0) - (bottom ? radius : 0));
+
+      if (bottom) {
+        translate([0, 0, radius])
+        sphere(r=radius);
+      }
+      
+      if (top) {
+        translate([0, 0, size.z - radius])
+        sphere(r=radius);
+      }
+    }
+  }
 }
 
 pcb_length = 70.1;
@@ -23,7 +42,7 @@ module pcb() {
       color("green")
       cube([pcb_length, pcb_width, pcb_thickness]);
 
-      color("silver")
+      *color("silver")
       for(x=[pcb_pad_start_x:pcb_pad_pitch:pcb_pad_start_x + pcb_pad_count_x * pcb_pad_pitch - .1])
         translate([x, 0, 0])
         for(y=[pcb_pad_start_y:pcb_pad_pitch:pcb_pad_start_y + pcb_pad_count_y * pcb_pad_pitch - .1])
@@ -40,7 +59,11 @@ module pcb() {
 }
 
 pin_diameter = 0.8;
-pin_height = 6;
+pin_height = 3;
+
+module pin() {
+  cylinder(d=pin_diameter, h=pin_height);
+}
 
 holder_cube_length = 7.3;
 holder_cube_width = 3.3;
@@ -84,24 +107,98 @@ module battery_holder() {
 
   // pins
   translate([0, 0, -pin_height])
-  cylinder(d=pin_diameter, h=pin_height);
+  pin();
+
   translate([0, 8 * pcb_pad_pitch, -pin_height])
-  cylinder(d=pin_diameter, h=pin_height);
+  pin();
 }
 
-battery_holder_pos = [pcb_pad_start_x + 11 * pcb_pad_pitch, pcb_pad_start_y + 1 * pcb_pad_pitch, 0];
+module battery_holder_cutout() {
+  translate([
+    -holder_cube_length / 2 - battery_holder_case_cutout_margin,
+    -holder_cube_width / 2 - battery_holder_case_cutout_margin,
+    -epsilon
+  ])
+  cube([
+    holder_cube_length + battery_holder_case_cutout_margin * 2,
+    holder_cube_width + battery_holder_case_cutout_margin * 2,
+    2 * case_bottom_thickness
+  ]);
+
+  translate([
+    0,
+    holder_total_width - holder_cube_width / 2 - holder_cylinder_diameter / 2,
+    -epsilon
+  ])
+  cylinder(
+    d=holder_cylinder_diameter + battery_holder_case_cutout_margin * 2,
+    h=2 * case_bottom_thickness,
+    $fn=32
+  );
+}
+
+button_body_length = 5;
+button_body_width = 3;
+button_body_height = 3.3;
+button_interpin = 3 * pcb_pad_pitch;
+
+module button() {
+  color("white")
+  translate([-button_body_length / 2, -button_body_width / 2, 0]) {
+    cube([button_body_length, button_body_width, button_body_height]);
+
+    translate([button_body_length / 4, button_body_width / 3, 0])
+    cube([button_body_length / 2, button_body_width / 3, button_body_height * 1.4]);
+  }
+  
+  translate([-button_interpin / 2, -pin_diameter / 2, 0]) {
+    cube([button_interpin, pin_diameter, pin_diameter]);
+  }
+
+  translate([-button_interpin / 2, 0, -pin_height + pcb_thickness / 2]) {
+    pin();
+
+    translate([button_interpin, 0, 0])
+    pin();
+  }
+}
+
+function pcb_pos(x, y) = [ pcb_pad_start_x + (x - 1) * pcb_pad_pitch, pcb_pad_start_y + (y - 1) * pcb_pad_pitch ];
+
+battery_holder_pos = pcb_pos(13, 17);
+
+button_down_pos = pcb_pos(2, 3) + [button_interpin / 2, 0, 0];
+button_up_pos = pcb_pos(2, 8) + [button_interpin / 2, 0, 0];
+button_left_pos = pcb_pos(1, 4) + [0, button_interpin / 2, 0];
+button_right_pos = pcb_pos(6, 4) + [0, button_interpin / 2, 0];
+
+button_a_pos = pcb_pos(19, 4) + [button_interpin / 2, 0, 0];
+button_b_pos = pcb_pos(21, 6) + [button_interpin / 2, 0, 0];
 
 module board() {
   pcb();
 
+  // battery holder
   translate(battery_holder_pos)
-  rotate([0, 180, 0])
+  rotate([0, 180, 180])
   battery_holder();
+
+  // buttons
+  translate([0, 0, pcb_thickness]) {
+    for (pos=[button_down_pos, button_up_pos, button_a_pos, button_b_pos])
+      translate(pos)
+      button();
+
+    for (pos=[button_left_pos, button_right_pos])
+      translate(pos)
+      rotate([0, 0, 90])
+      button();
+  }
 }
 
 case_edge_thickness = 1.05; // actual 1.2
 case_edge_margin = 0.5;
-case_height = 10;
+case_height = 11;
 case_bottom_height = 5.4;
 case_bottom_thickness = .8;
 case_bottom_support_width = 7.35;
@@ -172,23 +269,24 @@ module case_bottom_cutter() {
   }
 }
 
+dpad_pos = (button_left_pos + button_right_pos + button_up_pos + button_down_pos) / 4;
+dpad_arm_width = (button_right_pos.x - button_left_pos.x) / 2;
+dpad_length = dpad_arm_width * 3;
+dpad_margin = 0.5;
+
 module full_case() {
   difference() {
     // case exterior
-    hull() {
-      for(x=[-case_edge_margin, pcb_length + case_edge_margin],
-          y=[-case_edge_margin, pcb_width + case_edge_margin])
-      translate([x, y, 0])
-      {
-        translate([0, 0, case_edge_thickness])
-        cylinder(r=case_edge_thickness, h=case_height - 2 * case_edge_thickness, $fn=16);
-
-        for (z=[case_edge_thickness, case_height - case_edge_thickness])
-          translate([0, 0, z])
-          sphere(r=case_edge_thickness, $fn=16);
-      }
-    }
-
+    translate([-case_edge_margin - case_edge_thickness, -case_edge_margin - case_edge_thickness, 0])
+    roundcube(
+      [
+        pcb_length + 2 * (case_edge_margin + case_edge_thickness),
+        pcb_width + 2 * (case_edge_margin + case_edge_thickness),
+        case_height
+      ],
+      radius=case_edge_thickness, top=true, bottom=true, $fn=16
+    );
+    
     // case inner space
     union() {
       difference() {
@@ -214,29 +312,27 @@ module full_case() {
 
     // battery holder cutout
     translate(battery_holder_pos)
-    {
-      translate([
-        -holder_cube_length / 2 - battery_holder_case_cutout_margin,
-        -holder_cube_width / 2 - battery_holder_case_cutout_margin,
-        -epsilon
-      ])
-      cube([
-        holder_cube_length + battery_holder_case_cutout_margin * 2,
-        holder_cube_width + battery_holder_case_cutout_margin * 2,
-        2 * case_bottom_thickness
-      ]);
-
-      translate([
-        0,
-        holder_total_width - holder_cube_width / 2 - holder_cylinder_diameter / 2,
-        -epsilon
-      ])
-      cylinder(
-        d=holder_cylinder_diameter + battery_holder_case_cutout_margin * 2,
-        h=2 * case_bottom_thickness,
-        $fn=32
-      );
-    }
+    rotate([0, 0, 180])
+    battery_holder_cutout();
+    
+    // dpad cutout
+    dpad_cutout();
+    
+    // button cutouts
+    button_cutouts();
+    
+    // screen cutout
+    screen_length = 9 * pcb_pad_pitch;
+    screen_width = 5 * pcb_pad_pitch;
+    screen_roundness = 0.5;
+    translate([0, 0, case_height - case_bottom_thickness - epsilon])
+    translate(pcb_pos(8, 11.5))
+    roundcube([screen_length, screen_width, 2 * case_bottom_thickness], screen_roundness);
+    
+    // switch cutout
+    translate([0, 0, case_height - case_bottom_thickness - epsilon])
+    translate(pcb_pos(0.5, 15))
+    roundcube([pcb_pad_pitch, 2 * pcb_pad_pitch, 2 * case_bottom_thickness], screen_roundness);    
 
     // screw holes
     translate([0, 0, -epsilon])
@@ -250,6 +346,77 @@ module full_case() {
         cylinder(h=case_bottom_support_height - screw_bottom_case_thickness, d=screw_head_diameter);
       }
     }
+  }
+}
+
+dpad_lip_thickness = 0.4;
+dpad_lip_width = 1.5;
+dpad_thickness = 3;
+dpad_roundness = .8;
+
+module dpad() {
+  color("red")
+  translate(dpad_pos)
+  difference() {
+    union() {
+      translate([-dpad_length / 2 - dpad_lip_width, -dpad_arm_width / 2 - dpad_lip_width, 0])
+      roundcube([dpad_length + dpad_lip_width * 2, dpad_arm_width + dpad_lip_width * 2, dpad_lip_thickness], dpad_roundness);
+
+      translate([-dpad_length / 2, -dpad_arm_width / 2, 0])
+      roundcube([dpad_length, dpad_arm_width, dpad_thickness], dpad_roundness, top=true);
+
+      translate([-dpad_arm_width / 2 - dpad_lip_width, -dpad_length / 2 - dpad_lip_width, 0])
+      roundcube([dpad_arm_width + dpad_lip_width * 2, dpad_length + dpad_lip_width * 2, dpad_lip_thickness], dpad_roundness);
+
+      translate([-dpad_arm_width / 2, -dpad_length / 2, 0])
+      roundcube([dpad_arm_width, dpad_length, dpad_thickness], dpad_roundness, top=true);
+    }
+    
+    translate([0, 0, dpad_thickness + dpad_arm_width * .9])
+    sphere(d = 2*dpad_arm_width);
+  }
+}
+
+module dpad_cutout() {
+  translate([0, 0, case_height - case_bottom_thickness - epsilon])
+  translate(dpad_pos) {
+    translate([-dpad_length / 2 - dpad_margin, -dpad_arm_width / 2 - dpad_margin, 0])
+    roundcube([dpad_length + 2 * dpad_margin, dpad_arm_width + 2 * dpad_margin, 2 * case_bottom_thickness], dpad_roundness);
+
+    translate([-dpad_arm_width / 2 - dpad_margin, -dpad_length / 2 - dpad_margin, 0])
+    roundcube([dpad_arm_width + 2 * dpad_margin, dpad_length + 2 * dpad_margin, 2 * case_bottom_thickness], dpad_roundness);
+  }
+}
+
+button_cover_margin = 0.3;
+button_cover_diameter = 4;
+button_cover_lip_width = dpad_lip_width;
+button_cover_thickness = dpad_thickness;
+button_cover_lip_thickness = dpad_lip_thickness;
+button_cover_sphere_diameter = 10;
+
+module button_covers() {
+  color("red")
+  for(pos=[button_a_pos, button_b_pos])
+    translate(pos)
+    button_cover();
+}
+
+module button_cover() {
+  cylinder(d=button_cover_diameter + 2 * button_cover_lip_width, h=button_cover_lip_thickness);
+  intersection() {
+    cylinder(d=button_cover_diameter, h=dpad_thickness);
+    
+    translate([0, 0, button_cover_thickness - button_cover_sphere_diameter / 2])
+    sphere(d=button_cover_sphere_diameter, $fn=64);
+  }
+}
+
+module button_cutouts() {
+  for(pos=[button_a_pos, button_b_pos]) {
+    translate(pos)
+    translate([0, 0, case_height - case_bottom_thickness - epsilon])
+    cylinder(d=button_cover_diameter + 2 * button_cover_margin, h=2 * case_bottom_thickness);
   }
 }
 
@@ -268,20 +435,47 @@ module cutout(enable=false) {
   }
 }
 
-cutout(false) {
+module assembly(open=0, cut=false) {
+  cutout(cut) {
 
-  %#translate([0, 0, case_bottom_support_height])
-  board();
+    //%#!
+    *translate([0, 0, case_bottom_support_height])
+    board();
 
-  //translate([0, pcb_width * 1.2, 0])
-  case_bottom();
+    //translate([0, pcb_width * 1.2, 0])
+    case_bottom();
 
-  translate([0, 0, 10])
-  case_top();
+    translate([0, 0, open])
+    union() {
+      case_top();
+      translate([0, 0, case_height - case_bottom_thickness - button_cover_lip_thickness - .1]) {
+        dpad();
+        button_covers();
+      }
+    }
 
-  *translate([0, 0, case_height])
-  mirror([0, 0, 1])
-  case_top();
+    *translate([0, 0, case_height])
+    mirror([0, 0, 1])
+    case_top();
 
-  *full_case();
+    *full_case();
+  }
 }
+
+module printable() {
+  case_bottom();
+  
+  translate([-10, 0, case_height])
+  rotate([0, 180, 0])
+  case_top();
+  
+  translate([0, pcb_width * 1.2, 0]) {
+    dpad();
+    button_covers();
+  }  
+}
+
+assembly(open=5, cut=false);
+*printable();
+
+// 1:1 distance = 330
