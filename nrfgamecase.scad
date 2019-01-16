@@ -1,23 +1,25 @@
 $fn = 16;
 epsilon = 0.01;
 
-module roundcube(size, radius, top=false, bottom=false, $fn=8) {
+module roundcube(size, radius, top_radius=-1, top=false, bottom=false, $fn=8) {
+  bottom_radius = radius;
+  real_top_radius = top_radius < 0 ? radius : top_radius;
   hull() {
     for(x=[radius, size.x - radius],
         y=[radius, size.y - radius])
     translate([x, y, 0])
     {
       translate([0, 0, bottom ? radius : 0])
-      cylinder(r=radius, h=size.z - (top ? radius : 0) - (bottom ? radius : 0));
+      cylinder(r1=bottom_radius, r2=real_top_radius, h=size.z - (top ? real_top_radius : 0) - (bottom ? bottom_radius : 0));
 
       if (bottom) {
-        translate([0, 0, radius])
-        sphere(r=radius);
+        translate([0, 0, bottom_radius])
+        sphere(r=bottom_radius);
       }
       
       if (top) {
-        translate([0, 0, size.z - radius])
-        sphere(r=radius);
+        translate([0, 0, size.z - real_top_radius])
+        sphere(r=real_top_radius);
       }
     }
   }
@@ -327,7 +329,7 @@ module full_case() {
     screen_roundness = 0.5;
     translate([0, 0, case_height - case_bottom_thickness - epsilon])
     translate(pcb_pos(8, 11.5))
-    roundcube([screen_length, screen_width, 2 * case_bottom_thickness], screen_roundness);
+    roundcube([screen_length, screen_width, case_bottom_thickness + epsilon], radius=0, top_radius=screen_roundness);
     
     // switch cutout
     translate([0, 0, case_height - case_bottom_thickness - epsilon])
@@ -462,7 +464,7 @@ module assembly(open=0, cut=false) {
   }
 }
 
-module printable() {
+module platter() {
   case_bottom();
   
   translate([-10, 0, case_height])
@@ -472,10 +474,25 @@ module printable() {
   translate([0, pcb_width * 1.2, 0]) {
     dpad();
     button_covers();
-  }  
+  }
 }
 
-assembly(open=5, cut=false);
-*printable();
+part = "none";
 
+if (part == "dpad") {
+  dpad();
+} else if (part == "button") {
+  button_cover();
+} else if (part == "bottom") {
+  case_bottom();
+} else if (part == "top") {
+  translate([-10, 0, case_height])
+  rotate([180, 0, 0])
+  case_top();
+} else {
+  *assembly(open=5, cut=false);
+  *platter();
+  *projection() { case_top(); }
+  case_top();
+}
 // 1:1 distance = 330
